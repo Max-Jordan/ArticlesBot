@@ -2,7 +2,6 @@ package bot
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -25,26 +24,27 @@ type Bot struct {
 	api      string
 	basePath string
 	client   *http.Client
+	updates  chan Update
 	botStop  chan any
 }
 
-func NewBot(token string) Bot {
-	return Bot{
+func NewBot(token string, limit int) *Bot {
+	return &Bot{
 		token:    token,
 		api:      API,
 		basePath: "bot" + token,
 		client:   http.DefaultClient,
+		updates:  make(chan Update, limit),
 		botStop:  make(chan any),
 	}
 }
 
-func (b *Bot) StartPolling(config UpdateConfig) UpdateChan {
-	ch := make(chan Update, 100)
+func (b *Bot) StartPolling(config UpdateConfig) {
 	go func() {
 		for {
 			select {
 			case <-b.botStop:
-				close(ch)
+				close(b.updates)
 				return
 			default:
 			}
@@ -59,22 +59,26 @@ func (b *Bot) StartPolling(config UpdateConfig) UpdateChan {
 			for _, update := range updates {
 				if update.UpdateId >= config.Offset {
 					config.Offset = update.UpdateId + 1
-					ch <- update
+					b.updates <- update
 				}
 			}
 		}
 	}()
-	return ch
+}
+
+func (b *Bot) GetUpdates() UpdateChan {
+	return b.updates
 }
 
 func (b *Bot) StopPolling() {
 	close(b.botStop)
 }
 
-func (b Bot) SendMessage(chatId int, text string) (Message, error) {
+func (b Bot) SendMessage(message Message, text string) (Message, error) {
 	val := url.Values{}
-	val.Add("chat_id", strconv.Itoa(chatId))
+	val.Add("chat_id", strconv.Itoa(message.Chat.ChatId))
 	val.Add("text", text)
+	val.Add("parse_mode", "MarkdownV2")
 	resp := b.doRequest(http.MethodPost, sendMessageMthod, val)
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
@@ -117,11 +121,7 @@ func (b Bot) ReplyToMessage(message Message, text string) (Message, error) {
 	return mess, nil
 }
 
-func (b Bot) SendInlineKeyBoard(message Message) (Message, error) {
-	btn := KeyboardButton{Text: "Save article", CallBack: "save_article"}
-	keyboard := InlineKeyboardMarkup{
-		InlineKeyboard: [][]KeyboardButton{{btn}},
-	}
+func (b Bot) SendInlineKeyBoard(message Message, keyboard InlineKeyboardMarkup) (Message, error) {
 	data, err := json.Marshal(keyboard)
 	if err != nil {
 		log.Println(e.Wrap("Marshalling data erro ", err))
@@ -162,7 +162,6 @@ func (b Bot) getUpdates(config UpdateConfig) ([]Update, error) {
 	resp := b.doRequest(http.MethodGet, getUpdatesMethod, val)
 	defer resp.Body.Close()
 	data, err := io.ReadAll(resp.Body)
-	fmt.Println(string(data))
 	if err != nil {
 		return nil, e.Wrap("Getting updates error", err)
 	}

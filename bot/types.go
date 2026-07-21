@@ -18,9 +18,10 @@ type UpdateConfig struct {
 }
 
 type CallbackQuery struct {
-	Id   string `json:"id"`
-	From User   `json:"from"`
-	Data string `json:"data"`
+	Id      string  `json:"id"`
+	From    User    `json:"from"`
+	Data    string  `json:"data"`
+	Message Message `json:"message"`
 }
 
 type Message struct {
@@ -33,10 +34,10 @@ type Message struct {
 }
 
 type InlineKeyboardMarkup struct {
-	InlineKeyboard [][]KeyboardButton `json:"inline_keyboard"`
+	InlineKeyboard [][]KeyboadBtn `json:"inline_keyboard"`
 }
 
-type KeyboardButton struct {
+type KeyboadBtn struct {
 	Text     string `json:"text"`
 	CallBack string `json:"callback_data"`
 }
@@ -47,7 +48,7 @@ type ReplyParameters struct {
 }
 
 type User struct {
-	UserId   int    `json:"id"`
+	UserId   int64  `json:"id"`
 	IsBot    bool   `json:"is_bot"`
 	Name     string `json:"first_name"`
 	UserName string `json:"username"`
